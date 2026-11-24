@@ -1,7 +1,15 @@
 // THE WORLD TODAY — Tuesday 24 November 2026, one-page newspaper front page.
-// Written from scratch in this session: own 5x7 dot-matrix type, own pixel
-// canvas, own PNG writer (Node 22 stdlib only, no assets, no network).
+//
+// Render pipeline (all hand-written, Node stdlib only, no assets, no network):
+//   1. A pixel canvas: Sheet paints a 1024x1024 RGB frame (PAPER background)
+//      with fills, rules, frames, Bresenham lines and 5x7 dot-matrix type.
+//   2. drawPage() lays out the front page on that canvas: dateline bar,
+//      masthead, lead story with a chip illustration, six 3x2 story panels,
+//      a news ticker and a sources footer.
+//   3. toPNG() serializes the canvas as a minimal PNG (filter-0 rows,
+//      zlib level 9, fixed CRC table) and main() writes /output/entry.png.
 // Deterministic: no clock, no randomness — two runs write identical bytes.
+// The canvas is fixed at 1024x1024 so the image fits the bounty frame.
 import { deflateSync } from "node:zlib";
 import { mkdirSync, writeFileSync } from "node:fs";
 
@@ -364,6 +372,11 @@ function drawPage(): Sheet {
 
 function main() {
   const png = toPNG(drawPage());
+  // Fail fast on a corrupt render instead of writing a broken entry file:
+  // a valid PNG is never empty and always starts with the 0x89 'PNG' magic.
+  if (png.length === 0 || png[0] !== 0x89 || png[1] !== 0x50) {
+    throw new Error("render produced an invalid PNG");
+  }
   mkdirSync("/output", { recursive: true });
   writeFileSync("/output/entry.png", png);
   console.log(`wrote /output/entry.png ${png.length} bytes`);
